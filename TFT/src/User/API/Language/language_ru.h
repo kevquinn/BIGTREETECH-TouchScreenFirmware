@@ -25,6 +25,7 @@
     #define RU_POINT_2                "Точка 2"
     #define RU_POINT_3                "Точка 3"
     #define RU_POINT_4                "Точка 4"
+    #define RU_POINT_5                "Точка 5"
     #define RU_ABL                    "ABL"
     #define RU_BLTOUCH                "Bltouch"
     #define RU_BLTOUCH_TEST           "BLT тест"

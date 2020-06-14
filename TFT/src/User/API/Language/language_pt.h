@@ -25,6 +25,7 @@
     #define PT_POINT_2              "Ponto 2"
     #define PT_POINT_3              "Ponto 3"
     #define PT_POINT_4              "Ponto 4"
+    #define PT_POINT_5              "Ponto 5"
     #define PT_ABL                  "ABL"
     #define PT_BLTOUCH              "Bltouch"
     #define PT_BLTOUCH_TEST         "Testar"

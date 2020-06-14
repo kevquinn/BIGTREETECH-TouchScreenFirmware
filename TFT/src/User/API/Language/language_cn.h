@@ -25,6 +25,7 @@
     #define CN_POINT_2              "第二点"
     #define CN_POINT_3              "第三点"
     #define CN_POINT_4              "第四点"
+    #define CN_POINT_5              "第五点"
     #define CN_ABL                  "自动调平"
     #define CN_BLTOUCH              "Bltouch"
     #define CN_BLTOUCH_TEST         "BL自检"
