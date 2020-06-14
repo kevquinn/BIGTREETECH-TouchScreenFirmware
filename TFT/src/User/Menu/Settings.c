@@ -25,14 +25,14 @@ void infoSettingsReset(void)
   infoSettings.mode                 = DEFAULT_LCD_MODE;
   infoSettings.unified_menu         = UNIFIED_MENU;
 
-  infoSettings.bg_color             = BACKGROUND_COLOR;
-  infoSettings.font_color           = FONT_COLOR;
-  infoSettings.title_bg_color       = TITLE_BACKGROUND_COLOR;
-  infoSettings.reminder_color       = REMINDER_FONT_COLOR;
-  infoSettings.sd_reminder_color    = VOLUME_REMINDER_FONT_COLOR;
-  infoSettings.status_xyz_bg_color  = STATUS_XYZ_BG_COLOR;
-  infoSettings.list_border_color    = LISTVIEW_BORDER_COLOR;
-  infoSettings.list_button_color    = LISTVIEW_ICON_COLOR;
+  infoSettings.bg_color             = lcd_colors[BACKGROUND_COLOR];
+  infoSettings.font_color           = lcd_colors[FONT_COLOR];
+  infoSettings.title_bg_color       = lcd_colors[TITLE_BACKGROUND_COLOR];
+  infoSettings.reminder_color       = lcd_colors[REMINDER_FONT_COLOR];
+  infoSettings.sd_reminder_color    = lcd_colors[VOLUME_REMINDER_FONT_COLOR];
+  infoSettings.status_xyz_bg_color  = lcd_colors[STATUS_XYZ_BG_COLOR];
+  infoSettings.list_border_color    = lcd_colors[LISTVIEW_BORDER_COLOR];
+  infoSettings.list_button_color    = lcd_colors[LISTVIEW_ICON_COLOR];
 
   infoSettings.silent               = DISABLED;
   infoSettings.terminalACK          = DISABLED;
@@ -48,11 +48,11 @@ void infoSettingsReset(void)
   infoSettings.lcd_idle_brightness  = DEFAULT_LCD_IDLE_BRIGHTNESS;
   infoSettings.lcd_idle_timer       = DEFAULT_LCD_IDLE_TIMER;
 
-  infoSettings.serial_alwaysOn            = SERIAL_ALWAYS_ON;
-  infoSettings.marlin_mode_bg_color       = ST7920_BKCOLOR;
-  infoSettings.marlin_mode_font_color     = ST7920_FNCOLOR;
-  infoSettings.marlin_mode_showtitle      = ST7920_SHOW_BANNER;
-  infoSettings.marlin_mode_fullscreen     = DEFAULT_ST7920_FULLSCREEN_MODE;
+  infoSettings.serial_alwaysOn        = SERIAL_ALWAYS_ON;
+  infoSettings.marlin_mode_bg_color   = lcd_colors[ST7920_BKCOLOR];
+  infoSettings.marlin_mode_font_color = lcd_colors[ST7920_FNCOLOR];
+  infoSettings.marlin_mode_showtitle  = ST7920_SHOW_BANNER;
+  infoSettings.marlin_mode_fullscreen = DEFAULT_ST7920_FULLSCREEN_MODE;
 
   infoSettings.auto_off               = DISABLED;
   infoSettings.ps_active_high         = PS_ON_ACTIVE_HIGH;
@@ -205,7 +205,7 @@ void menuInfo(void)
   u16 centerY = LCD_HEIGHT/2;
   u16 startX = MIN(HW_X, FW_X);
 
-  GUI_Clear(lcd_colors[infoSettings.bg_color]);
+  GUI_Clear(infoSettings.bg_color);
 
   my_sprintf(buf, "SYS:%dMhz", mcuClocks.rccClocks.SYSCLK_Frequency / 1000000);
   GUI_DispString(clocks[0].x, clocks[0].y, (uint8_t *)buf);
@@ -238,7 +238,7 @@ void menuInfo(void)
 // Set uart pins to input, free uart
 void menuDisconnect(void)
 {
-  GUI_Clear(lcd_colors[infoSettings.bg_color]);
+  GUI_Clear(infoSettings.bg_color);
   GUI_DispStringInRect(20, 0, LCD_WIDTH-20, LCD_HEIGHT, textSelect(LABEL_DISCONNECT_INFO));
   GUI_DispStringInRect(20, LCD_HEIGHT - (BYTE_HEIGHT*2), LCD_WIDTH-20, LCD_HEIGHT, textSelect(LABEL_TOUCH_TO_EXIT));
 
@@ -250,7 +250,79 @@ void menuDisconnect(void)
   infoMenu.cur--;
 }
 
-MENUITEMS settingsItems = {
+
+const char* item_baudrate_str[ITEM_BAUDRATE_NUM] = {"2400", "9600", "19200", "38400", "57600", "115200", "250000", "500000", "1000000"};
+const u32   item_baudrate[ITEM_BAUDRATE_NUM] = {2400, 9600, 19200, 38400, 57600, 115200, 250000, 500000, 1000000};
+
+void menuBaudrate(void)
+{
+  LABEL title = {LABEL_BAUDRATE};
+  LISTITEM totalItems[ITEM_BAUDRATE_NUM];
+  KEY_VALUES key_num = KEY_IDLE;
+  SETTINGS now = infoSettings;
+  uint8_t cur_item;
+
+  // fill baudrate items
+  for(uint8_t i = 0; i < COUNT(totalItems); i++) {
+    if (infoSettings.baudrate == item_baudrate[i]) {
+      totalItems[i].icon = ICONCHAR_CHECKED;
+      cur_item = i;
+    } else {
+      totalItems[i].icon = ICONCHAR_UNCHECKED;
+    }
+    totalItems[i].itemType = LIST_LABEL;
+    totalItems[i].titlelabel.address = (uint8_t *)item_baudrate_str[i];
+  }
+
+  listWidgetCreat(title, totalItems, COUNT(totalItems), cur_item / LISTITEM_PER_PAGE);
+
+  while (infoMenu.menu[infoMenu.cur] == menuBaudrate)
+  {
+    key_num = menuKeyGetValue();
+    switch (key_num)
+    {
+    case KEY_ICON_5:
+      listWidgetPreviousPage();
+      break;
+
+    case KEY_ICON_6:
+      listWidgetNextPage();
+      break;
+
+    case KEY_ICON_7:
+      infoMenu.cur--;
+      break;
+
+    default:
+      if(key_num < LISTITEM_PER_PAGE){
+        uint16_t tmp_i = listWidgetGetCurPage() * LISTITEM_PER_PAGE + key_num;
+        if (tmp_i != cur_item) { // has changed
+          totalItems[cur_item].icon = ICONCHAR_UNCHECKED;
+          listWidgetRefreshItem(cur_item); // refresh unchecked status
+          cur_item = tmp_i;
+          totalItems[cur_item].icon = ICONCHAR_CHECKED;
+          listWidgetRefreshItem(cur_item); // refresh checked status
+
+          infoSettings.baudrate = item_baudrate[cur_item];
+          Serial_ReSourceDeInit(); // Serial_Init() will malloc a dynamic memory, so Serial_DeInit() first to free, then malloc again.
+          Serial_ReSourceInit();
+          reminderMessage(LABEL_UNCONNECTED, STATUS_UNCONNECT);
+        }
+      }
+      break;
+    }
+
+    loopProcess();
+  }
+
+  if(memcmp(&now, &infoSettings, sizeof(SETTINGS)))
+  {
+    storePara();
+  }
+}
+
+
+const MENUITEMS settingsItems = {
 // title
 LABEL_SETTINGS,
 // icon                       label
@@ -259,39 +331,14 @@ LABEL_SETTINGS,
   {ICON_FEATURE_SETTINGS,     LABEL_FEATURE_SETTINGS},
   {ICON_SCREEN_INFO,          LABEL_SCREEN_INFO},
   {ICON_DISCONNECT,           LABEL_DISCONNECT},
-  {ICON_BAUD_RATE,            LABEL_BACKGROUND},
+  {ICON_BAUD_RATE,            LABEL_BAUDRATE},
   {ICON_BACKGROUND,           LABEL_BACKGROUND},
   {ICON_BACK,                 LABEL_BACK},}
 };
 
-const ITEM itemBaudrate[ITEM_BAUDRATE_NUM] = {
-// icon                       label
-  {ICON_BAUD_RATE,             {.address = "2400"}},
-  {ICON_BAUD_RATE,             {.address = "9600"}},
-  {ICON_BAUD_RATE,             {.address = "19200"}},
-  {ICON_BAUD_RATE,             {.address = "38400"}},
-  {ICON_BAUD_RATE,             {.address = "57600"}},
-  {ICON_BAUD_RATE,             {.address = "115200"}},
-  {ICON_BAUD_RATE,             {.address = "250000"}},
-  {ICON_BAUD_RATE,             {.address = "500000"}},
-  {ICON_BAUD_RATE,             {.address = "1000000"}},
-};
-const  u32 item_baudrate[ITEM_BAUDRATE_NUM] = {2400, 9600, 19200, 38400, 57600, 115200, 250000, 500000, 1000000};
-static u8  item_baudrate_i = 0;
-
 void menuSettings(void)
 {
   KEY_VALUES key_num = KEY_IDLE;
-  SETTINGS now = infoSettings;
-
-  for(u8 i=0; i<ITEM_BAUDRATE_NUM; i++)
-  {
-    if(infoSettings.baudrate == item_baudrate[i])
-    {
-      item_baudrate_i = i;
-      settingsItems.items[KEY_ICON_5] = itemBaudrate[item_baudrate_i];
-    }
-  }
 
   menuDrawPage(&settingsItems);
 
@@ -300,48 +347,17 @@ void menuSettings(void)
     key_num = menuKeyGetValue();
     switch(key_num)
     {
-      case KEY_ICON_0:
-        infoMenu.menu[++infoMenu.cur] = menuScreenSettings;
-        break;
+      case KEY_ICON_0: infoMenu.menu[++infoMenu.cur] = menuScreenSettings; break;
+      case KEY_ICON_1: infoMenu.menu[++infoMenu.cur] = menuMachineSettings; break;
+      case KEY_ICON_2: infoMenu.menu[++infoMenu.cur] = menuFeatureSettings; break;
+      case KEY_ICON_3: infoMenu.menu[++infoMenu.cur] = menuInfo; break;
+      case KEY_ICON_4: infoMenu.menu[++infoMenu.cur] = menuDisconnect; break;
+      case KEY_ICON_5: infoMenu.menu[++infoMenu.cur] = menuBaudrate; break;
 
-      case KEY_ICON_1:
-        infoMenu.menu[++infoMenu.cur] = menuMachineSettings;
-        break;
+      case KEY_ICON_7: infoMenu.cur--; break;
 
-      case KEY_ICON_2:
-        infoMenu.menu[++infoMenu.cur] = menuFeatureSettings;
-        break;
-
-      case KEY_ICON_3:
-        infoMenu.menu[++infoMenu.cur] = menuInfo;
-        break;
-
-      case KEY_ICON_4:
-        infoMenu.menu[++infoMenu.cur] = menuDisconnect;
-        break;
-
-      case KEY_ICON_5:
-        item_baudrate_i = (item_baudrate_i + 1) % ITEM_BAUDRATE_NUM;
-        settingsItems.items[key_num] = itemBaudrate[item_baudrate_i];
-        menuDrawItem(&settingsItems.items[key_num], key_num);
-        infoSettings.baudrate = item_baudrate[item_baudrate_i];
-        Serial_ReSourceDeInit(); // Serial_Init() will malloc a dynamic memory, so Serial_DeInit() first to free, then malloc again.
-        Serial_ReSourceInit();
-        reminderMessage(LABEL_UNCONNECTED, STATUS_UNCONNECT);
-        break;
-
-      case KEY_ICON_7:
-        infoMenu.cur--;
-        break;
-
-      default:
-        break;
+      default: break;
     }
     loopProcess();
-  }
-
-  if(memcmp(&now, &infoSettings, sizeof(SETTINGS)))
-  {
-    storePara();
   }
 }
